@@ -1,0 +1,2 @@
+# 可选：需要 YOLO ONNX 检测时安装
+onnxruntime==1.20.1

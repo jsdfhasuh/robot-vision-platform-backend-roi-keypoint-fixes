@@ -1,0 +1,137 @@
+# =========================
+# Robot Vision Platform
+# =========================
+
+# ---------- Python cache ----------
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyo
+*.pyd
+
+# ---------- Python virtual env ----------
+.venv/
+venv/
+env/
+ENV/
+backend/.venv/
+backend/venv/
+
+# ---------- Python tooling cache ----------
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+coverage.xml
+htmlcov/
+.tox/
+.nox/
+*.egg-info/
+build/
+dist/
+
+# ---------- IDE / OS ----------
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# ---------- Environment / secrets ----------
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.crt
+*.p12
+*.pfx
+
+# ---------- Runtime data ----------
+data/
+backend/data/
+backend/app/storage/snapshots/*
+backend/app/storage/clips/*
+!backend/app/storage/snapshots/.gitkeep
+!backend/app/storage/clips/.gitkeep
+
+# SQLite databases and backups
+*.db
+*.sqlite
+*.sqlite3
+*.db-shm
+*.db-wal
+*.bak
+*.backup
+backups/
+backend/backups/
+
+# Logs
+logs/
+backend/logs/
+backend/app/logs/
+*.log
+*.log.*
+
+# ---------- Generated vision artifacts ----------
+*.jpg
+*.jpeg
+*.png
+*.webp
+*.bmp
+*.mp4
+*.avi
+*.mov
+*.mkv
+*.m3u8
+*.ts
+
+# Keep docs images if intentionally added
+!docs/**/*.jpg
+!docs/**/*.jpeg
+!docs/**/*.png
+!docs/**/*.webp
+
+# ---------- AI model files ----------
+# Usually too large for Git. Use Git LFS or release artifacts if needed.
+models/*
+backend/models/*
+!models/.gitkeep
+!backend/models/.gitkeep
+*.onnx
+*.pt
+*.engine
+*.trt
+*.weights
+*.bin
+
+# ---------- Frontend dependencies/build ----------
+node_modules/
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+frontend/.cache/
+
+# Package manager logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# ---------- Docker / local compose override ----------
+docker-compose.override.yml
+compose.override.yml
+
+# ---------- MediaMTX runtime files ----------
+mediamtx/*.log
+mediamtx/recordings/
+mediamtx/hls/
+
+# ---------- Uploaded/generated archives ----------
+*.zip
+*.tar
+*.tar.gz
+*.tgz
+*.7z
+*.rar
