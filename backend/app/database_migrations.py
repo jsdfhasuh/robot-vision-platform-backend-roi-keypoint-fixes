@@ -46,3 +46,4 @@ def ensure_sqlite_indexes(engine) -> None:
         conn.execute(text("CREATE INDEX IF NOT EXISTS ix_event_frames_event_id ON event_frames(event_id)"))
         conn.execute(text("CREATE INDEX IF NOT EXISTS ix_event_frames_camera_id ON event_frames(camera_id)"))
         conn.execute(text("CREATE INDEX IF NOT EXISTS ix_model_registry_file_name ON model_registry(file_name)"))
+        conn.execute(text("CREATE INDEX IF NOT EXISTS ix_rule_templates_name ON rule_templates(name)"))

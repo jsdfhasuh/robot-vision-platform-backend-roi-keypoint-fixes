@@ -1,2 +1,5 @@
-# 可选：需要 YOLO ONNX 检测时安装
-onnxruntime==1.20.1
+# Compatibility file for older install docs/scripts.
+# ONNX Runtime is now part of requirements.txt because YOLO detectors and
+# /api/system/self-check both expect it in the backend runtime.
+
+-r requirements.txt

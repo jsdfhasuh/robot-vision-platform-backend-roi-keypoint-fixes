@@ -50,7 +50,45 @@ uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 http://127.0.0.1:8000/docs
 ```
 
-### Docker Compose
+### Docker Compose（仅后端）
+
+当前仓库主要包含后端代码。只部署后端时使用：
+
+```bash
+docker compose -f docker-compose.backend.yml up -d --build
+```
+
+打开：
+
+```text
+http://127.0.0.1:8000/docs
+http://127.0.0.1:8000/api/system/self-check
+```
+
+数据和模型目录会挂载到仓库根目录：
+
+```text
+./data
+./models
+```
+
+如需修改宿主机端口：
+
+```bash
+BACKEND_PORT=18000 docker compose -f docker-compose.backend.yml up -d --build
+```
+
+Windows PowerShell：
+
+```powershell
+$env:BACKEND_PORT="18000"
+docker compose -f docker-compose.backend.yml up -d --build
+```
+
+### Docker Compose（全栈骨架）
+
+`docker-compose.yml` 是全栈部署骨架，会引用 `frontend/` 和 `mediamtx/`。
+当前仓库快照没有这两个目录时，不要用它作为纯后端部署入口。
 
 ```bash
 docker compose up -d --build
@@ -450,7 +488,7 @@ curl http://localhost:8000/api/events/1/frames
 
 ```bash
 cd backend
-pip install -r requirements.txt pytest
+pip install -r requirements-dev.txt
 pytest -q
 ```
 

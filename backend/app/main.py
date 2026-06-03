@@ -20,6 +20,7 @@ from app.api.model_api import router as model_router
 from app.api.config_api import router as config_router
 from app.api.video_api import router as video_router
 from app.api.frontend_compat_api import router as frontend_compat_router
+from app.api.rule_api import camera_rule_router, template_router
 
 setup_logging()
 logger = get_logger(__name__)
@@ -49,6 +50,8 @@ app.include_router(model_router)
 app.include_router(config_router)
 app.include_router(video_router)
 app.include_router(frontend_compat_router)
+app.include_router(camera_rule_router)
+app.include_router(template_router)
 
 os.makedirs(settings.storage_dir, exist_ok=True)
 os.makedirs(settings.model_dir, exist_ok=True)

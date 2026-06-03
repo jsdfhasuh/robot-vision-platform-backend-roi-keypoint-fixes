@@ -1,0 +1,42 @@
+services:
+  backend:
+    build: ./backend
+    container_name: robot-vision-backend
+    ports:
+      - "${BACKEND_PORT:-8000}:8000"
+    volumes:
+      - ./data:/app/data
+      - ./models:/app/models
+    environment:
+      - APP_NAME=${APP_NAME:-Robot Vision Platform}
+      - DATABASE_URL=${DATABASE_URL:-sqlite:///./data/db/app.db}
+      - STORAGE_DIR=${STORAGE_DIR:-./data}
+      - MODEL_DIR=${MODEL_DIR:-./models}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - LOG_DIR=${LOG_DIR:-./data/logs}
+      - LOG_BACKUP_COUNT=${LOG_BACKUP_COUNT:-14}
+      - CORS_ORIGINS=${CORS_ORIGINS:-http://localhost:5173,http://127.0.0.1:5173,http://localhost:8080}
+      - ALERT_ENABLED=${ALERT_ENABLED:-false}
+      - ALERT_COOLDOWN_SECONDS=${ALERT_COOLDOWN_SECONDS:-300}
+      - NOTIFY_RECOVERY=${NOTIFY_RECOVERY:-true}
+      - WEBHOOK_URL=${WEBHOOK_URL:-}
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN:-}
+      - TELEGRAM_CHAT_ID=${TELEGRAM_CHAT_ID:-}
+      - EVENT_FRAME_SAMPLE_SECONDS=${EVENT_FRAME_SAMPLE_SECONDS:-10}
+      - EVENT_FRAME_MAX_PER_EVENT=${EVENT_FRAME_MAX_PER_EVENT:-60}
+      - CLEANUP_SAMPLE_FRAME_DAYS=${CLEANUP_SAMPLE_FRAME_DAYS:-30}
+      - CLEANUP_ORPHAN_FILE_DAYS=${CLEANUP_ORPHAN_FILE_DAYS:-14}
+      - BACKUP_KEEP_COUNT=${BACKUP_KEEP_COUNT:-10}
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/system/health', timeout=5).read()",
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+    restart: unless-stopped

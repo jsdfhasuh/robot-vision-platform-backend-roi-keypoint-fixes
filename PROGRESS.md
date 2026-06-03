@@ -342,3 +342,29 @@ GET /api/system/streams
 - `TrackBuffer` 新增 `keypoint_deltas`，支持逐关键点 delta。
 - `/api/debug/keypoints` 现在返回每个关键点自己的 `delta_px / avg_delta_px / moving / valid`。
 - 模型管理限制只允许 `.onnx`，与当前 ONNXRuntime 推理后端一致。
+
+## 2026-06-02 后端新增：规则面板接口、规则复制、规则模板
+
+本轮新增规则管理能力，供前端规则面板接入：
+
+- 新增单摄像头规则接口：
+  - `GET /api/cameras/{camera_ref}/rule`
+  - `PUT /api/cameras/{camera_ref}/rule`
+- 新增摄像头间规则复制接口：
+  - `POST /api/cameras/{source_ref}/rule/copy`
+- 新增规则模板接口：
+  - `GET /api/rule-templates`
+  - `POST /api/rule-templates`
+  - `GET /api/rule-templates/{template_id}`
+  - `PUT /api/rule-templates/{template_id}`
+  - `DELETE /api/rule-templates/{template_id}`
+  - `POST /api/rule-templates/{template_id}/apply`
+- 新增 `rule_templates` 表，用于保存规则模板。
+- 规则全量保存时会更新：
+  - `cameras.motion_threshold`
+  - `cameras.stop_seconds`
+  - `camera.detector_config.rule`
+  - `camera.detector_config.tracker`
+- 保存、复制、应用模板后会递增目标摄像头 `config_version`，Worker 可热更新。
+- 规则复制和模板应用只复制 rule/tracker，不复制 RTSP、模型、ROI 和摄像头基础信息。
+- 前端接入文档 `FRONTEND_INTEGRATION.md` 已新增“规则面板”章节。
