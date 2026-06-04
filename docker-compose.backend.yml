@@ -14,7 +14,7 @@ services:
       - LOG_LEVEL=${LOG_LEVEL:-INFO}
       - LOG_DIR=${LOG_DIR:-/app/data/logs}
       - LOG_BACKUP_COUNT=${LOG_BACKUP_COUNT:-14}
-      - CORS_ORIGINS=${CORS_ORIGINS:-http://localhost:5173,http://127.0.0.1:5173,http://localhost:8080}
+      - CORS_ORIGINS=${CORS_ORIGINS:-*}
       - ALERT_ENABLED=${ALERT_ENABLED:-false}
       - ALERT_COOLDOWN_SECONDS=${ALERT_COOLDOWN_SECONDS:-300}
       - NOTIFY_RECOVERY=${NOTIFY_RECOVERY:-true}

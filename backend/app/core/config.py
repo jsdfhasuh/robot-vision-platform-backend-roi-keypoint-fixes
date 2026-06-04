@@ -13,7 +13,7 @@ class Settings(BaseSettings):
     app_name: str = "Robot Vision Platform"
     database_url: str = f"sqlite:///{DEFAULT_DB_PATH.as_posix()}"
     storage_dir: str = str(DEFAULT_STORAGE_DIR)
-    cors_origins: str = "http://localhost:5173,http://127.0.0.1:5173,http://localhost:8080"
+    cors_origins: str = "*"
     log_level: str = "INFO"
     log_dir: str = str(DEFAULT_STORAGE_DIR / "logs")
     log_backup_count: int = 14

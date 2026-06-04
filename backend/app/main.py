@@ -32,10 +32,11 @@ ensure_sqlite_indexes(engine)
 logger.info("database tables checked/created")
 
 app = FastAPI(title=settings.app_name)
+allow_all_origins = "*" in settings.cors_origin_list
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.cors_origin_list,
-    allow_credentials=True,
+    allow_origins=["*"] if allow_all_origins else settings.cors_origin_list,
+    allow_credentials=not allow_all_origins,
     allow_methods=["*"],
     allow_headers=["*"],
 )
