@@ -59,7 +59,7 @@ def _database_file() -> Path | None:
     url = str(engine.url)
     if not url.startswith("sqlite"):
         return None
-    # sqlite:///./data/db/app.db 或 sqlite:////abs/path/app.db
+    # sqlite:////abs/path/app.db or sqlite:///relative/path/app.db
     database = engine.url.database
     if not database or database == ":memory:":
         return None

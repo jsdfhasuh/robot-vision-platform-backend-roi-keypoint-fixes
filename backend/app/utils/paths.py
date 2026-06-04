@@ -5,7 +5,7 @@ from app.core.config import settings
 
 
 def storage_path_to_url(path: str | None) -> str | None:
-    """把 ./data 或 /app/data 下的文件路径转换成前端可访问的 /data URL。"""
+    """把 storage_dir 下的文件路径转换成前端可访问的 /data URL。"""
     if not path:
         return None
     norm = os.path.normpath(path)

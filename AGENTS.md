@@ -19,8 +19,11 @@ Primary runtime stack:
 - OpenCV headless
 - ONNX Runtime for YOLO / pose models
 
-The default database is `sqlite:///./data/db/app.db`. Runtime files are stored
-under `data/`, model files under `models/`, and logs under `data/logs/`.
+The default database is under the backend code root at `data/db/app.db`.
+Runtime files are stored under `data/`, model files under `models/`, and logs
+under `data/logs/` relative to that backend code root. In the Docker backend
+compose, the code root is mounted at `/app`, so these resolve to `/app/data`,
+`/app/models`, and `/app/data/logs`.
 
 ## Repository Layout
 

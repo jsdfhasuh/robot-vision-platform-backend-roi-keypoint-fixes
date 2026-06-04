@@ -65,11 +65,24 @@ http://127.0.0.1:8000/docs
 http://127.0.0.1:8000/api/system/self-check
 ```
 
-数据和模型目录会挂载到仓库根目录：
+该 compose 会把后端代码目录挂载到容器 `/app`，用于本地边改边更新：
 
 ```text
-./data
-./models
+./backend -> /app
+```
+
+容器内默认运行路径为：
+
+```text
+/app/data
+/app/models
+```
+
+对应宿主机目录为：
+
+```text
+./backend/data
+./backend/models
 ```
 
 如需修改宿主机端口：
@@ -281,7 +294,7 @@ ALERT_ENABLED=false
 默认日志：
 
 ```text
-./data/logs/backend.log
+./backend/data/logs/backend.log
 ```
 
 调试时可设置：
@@ -524,7 +537,7 @@ curl -X POST http://127.0.0.1:8000/api/system/backup
 备份文件默认保存到：
 
 ```text
-./data/backups/
+./backend/data/backups/
 ```
 
 ### 清理旧数据

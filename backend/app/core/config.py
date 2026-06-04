@@ -1,14 +1,23 @@
+from pathlib import Path
+
 from pydantic_settings import BaseSettings
+
+
+APP_ROOT = Path(__file__).resolve().parents[2]
+DEFAULT_STORAGE_DIR = APP_ROOT / "data"
+DEFAULT_MODEL_DIR = APP_ROOT / "models"
+DEFAULT_DB_PATH = DEFAULT_STORAGE_DIR / "db" / "app.db"
+
 
 class Settings(BaseSettings):
     app_name: str = "Robot Vision Platform"
-    database_url: str = "sqlite:///./data/db/app.db"
-    storage_dir: str = "./data"
+    database_url: str = f"sqlite:///{DEFAULT_DB_PATH.as_posix()}"
+    storage_dir: str = str(DEFAULT_STORAGE_DIR)
     cors_origins: str = "http://localhost:5173,http://127.0.0.1:5173,http://localhost:8080"
     log_level: str = "INFO"
-    log_dir: str = "./data/logs"
+    log_dir: str = str(DEFAULT_STORAGE_DIR / "logs")
     log_backup_count: int = 14
-    model_dir: str = "./models"
+    model_dir: str = str(DEFAULT_MODEL_DIR)
     alert_enabled: bool = False
     alert_cooldown_seconds: int = 300
     notify_recovery: bool = True
