@@ -77,42 +77,41 @@ compose, the code root is mounted at `/app`, so these resolve to `/app/data`,
 
 ## Common Commands
 
-Install and run locally:
+Use the configured Conda environment for local development. Prefer explicit
+`conda run -n robot-vision ...` commands from automation so the system Python is
+not used accidentally.
+
+Install dependencies:
 
 ```bash
 cd backend
-python -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+conda activate robot-vision
+python -m pip install -r requirements-dev.txt
 ```
 
-Windows activation:
+Run locally:
 
-```powershell
+```bash
 cd backend
-python -m venv .venv
-.\.venv\Scripts\Activate.ps1
-pip install -r requirements.txt
-uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+conda activate robot-vision
+python -m uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 ```
 
-On this Windows workspace, prefer the project virtualenv explicitly when running
-commands from automation, because the system `python` may resolve to Anaconda:
+Automation-friendly commands:
 
-```powershell
+```bash
 cd backend
-.\.venv\Scripts\python.exe -m pip install -r requirements-dev.txt
-.\.venv\Scripts\python.exe -m pytest -q
-.\.venv\Scripts\python.exe -m uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+conda run -n robot-vision python -m pip install -r requirements-dev.txt
+conda run -n robot-vision python -m pytest -q
+conda run -n robot-vision python -m uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 ```
 
 Run tests:
 
 ```bash
 cd backend
-pip install -r requirements-dev.txt
-pytest -q
+conda activate robot-vision
+python -m pytest -q
 ```
 
 Docker:
@@ -181,22 +180,22 @@ For backend logic changes, run:
 
 ```bash
 cd backend
-pip install -r requirements-dev.txt
-pytest -q
+conda run -n robot-vision python -m pip install -r requirements-dev.txt
+conda run -n robot-vision python -m pytest -q
 ```
 
-On Windows in this workspace, use the explicit venv Python instead:
+If the shell is already inside the Conda environment:
 
-```powershell
+```bash
 cd backend
-.\.venv\Scripts\python.exe -m pytest -q
+python -m pytest -q
 ```
 
 For API or routing changes, also start the app and inspect:
 
 ```bash
 cd backend
-uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+conda run -n robot-vision python -m uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 ```
 
 Then check:
