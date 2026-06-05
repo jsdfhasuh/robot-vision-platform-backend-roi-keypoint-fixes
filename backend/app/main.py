@@ -11,7 +11,6 @@ from app.database import Base, engine
 from app.database_migrations import ensure_sqlite_columns, ensure_sqlite_indexes
 from app.models import Camera, CameraStatus, Event
 from app.api.camera_api import router as camera_router
-from app.api.worker_api import router as worker_router
 from app.api.debug_api import router as debug_router
 from app.api.status_api import router as status_router
 from app.api.event_api import router as event_router
@@ -20,7 +19,8 @@ from app.api.model_api import router as model_router
 from app.api.config_api import router as config_router
 from app.api.video_api import router as video_router
 from app.api.frontend_compat_api import router as frontend_compat_router
-from app.api.rule_api import camera_rule_router, template_router
+from app.api.detection_task_api import router as detection_task_router
+from app.api.shared_rule_api import router as shared_rule_router
 
 setup_logging()
 logger = get_logger(__name__)
@@ -42,7 +42,6 @@ app.add_middleware(
 )
 
 app.include_router(camera_router)
-app.include_router(worker_router)
 app.include_router(debug_router)
 app.include_router(status_router)
 app.include_router(event_router)
@@ -50,9 +49,9 @@ app.include_router(system_router)
 app.include_router(model_router)
 app.include_router(config_router)
 app.include_router(video_router)
+app.include_router(detection_task_router)
+app.include_router(shared_rule_router)
 app.include_router(frontend_compat_router)
-app.include_router(camera_rule_router)
-app.include_router(template_router)
 
 os.makedirs(settings.storage_dir, exist_ok=True)
 os.makedirs(settings.model_dir, exist_ok=True)
@@ -85,24 +84,35 @@ async def unhandled_exception_handler(request: Request, exc: Exception):
 
 import asyncio
 from app.database import SessionLocal
+from app.models.detection_task import TaskStatus
 from app.models.status import CameraStatus
+from app.services import detection_task_service, status_service
 from app.workers.ws_manager import ws_manager
 
 @app.on_event("startup")
 async def start_status_broadcaster():
+    db = SessionLocal()
+    try:
+        detection_task_service.ensure_defaults_for_all_cameras(db)
+    finally:
+        db.close()
     logger.info("status websocket broadcaster started")
     async def loop():
         while True:
             db = SessionLocal()
             try:
-                rows = db.query(CameraStatus).all()
+                rows = db.query(TaskStatus).all()
                 data = [{
+                    "task_id": r.task_id,
                     "camera_id": r.camera_id,
                     "status": r.status,
                     "last_frame_time": r.last_frame_time,
                     "last_motion_time": r.last_motion_time,
+                    "last_detect_time": r.last_detect_time,
                     "confidence": r.confidence,
                     "message": r.message,
+                    "reason_code": r.reason_code,
+                    "detail": r.detail,
                     "updated_at": r.updated_at,
                 } for r in rows]
                 await ws_manager.broadcast({"type": "status", "data": data})

@@ -117,8 +117,15 @@ POST   /api/cameras
 PUT    /api/cameras/{id}
 DELETE /api/cameras/{id}
 POST   /api/cameras/{id}/test
-POST   /api/cameras/{id}/start
-POST   /api/cameras/{id}/stop
+GET    /api/detection-tasks
+POST   /api/detection-tasks
+PUT    /api/detection-tasks/{id}
+DELETE /api/detection-tasks/{id}
+POST   /api/detection-tasks/{id}/start
+POST   /api/detection-tasks/{id}/stop
+GET    /api/detection-tasks/{id}/last-result
+GET    /api/rules
+POST   /api/rules
 ```
 
 ### 调试
@@ -128,7 +135,6 @@ POST /api/cameras/{id}/snapshot
 POST /api/cameras/{id}/debug-detect
 POST /api/cameras/{id}/image-detect
 POST /api/cameras/{id}/image-pair-detect
-GET  /api/cameras/{id}/last-result
 GET  /api/system/workers
 ```
 
@@ -333,13 +339,13 @@ rules/      负责状态判断
 保留原有接口路径，例如：
 
 ```text
-POST /api/cameras/{id}/start
 POST /api/cameras/{id}/debug-detect
 POST /api/cameras/{id}/image-detect
-GET  /api/cameras/{id}/last-result
+GET  /api/detection-tasks/{id}/last-result
 ```
 
-所以已有前端一般不需要因为本次后端架构拆分而改接口。
+摄像头 Worker 启停接口已被检测任务启停接口替代，前端需要迁移到
+`/api/detection-tasks`。
 
 ## API 统一响应格式
 
@@ -399,10 +405,12 @@ curl http://127.0.0.1:8000/api/system/workers
 
 ```text
 PUT /api/cameras/{id}
+PUT /api/detection-tasks/{id}
 POST /api/config/import
 ```
 
-如果配置发生变化，后端会自动递增 `config_version`。Worker 会检测版本变化并重置 tracker/rule，避免旧轨迹影响新配置。
+如果配置发生变化，后端会自动递增 `config_version`。Task runtime 会检测任务
+或共享规则版本变化并重置 tracker/rule，避免旧轨迹影响新配置。
 
 ## Worker 健康状态
 
@@ -410,7 +418,7 @@ POST /api/config/import
 
 ```text
 GET /api/system/workers
-GET /api/cameras/{id}/last-result
+GET /api/detection-tasks/{id}/last-result
 ```
 
 这些接口适合前端做“运行诊断面板”，字段包括：

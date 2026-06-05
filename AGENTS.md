@@ -51,25 +51,26 @@ compose, the code root is mounted at `/app`, so these resolve to `/app/data`,
 
 ## Important Concepts
 
-- Camera configuration includes `config_version`. When camera settings, ROI, or
-  model binding change, increment `config_version` so workers reset tracker/rule
-  state and pick up the new runtime configuration.
+- Cameras are video sources. Detection settings live on `detection_tasks`, not
+  on the camera runtime path. A camera can have multiple tasks sharing one RTSP
+  stream.
+- Detection tasks include `config_version`. When task ROI, detector, model, or
+  tracker settings change, increment task `config_version` so task runtimes reset
+  detector/tracker/rule state and pick up the new runtime configuration.
 - Robot stop detection is rule-based, not detector-specific. Detectors output a
   shared `DetectResult`; `SimpleTracker` turns recent motion into a movement
   score; `RobotStopRule` converts that score into `RUNNING`, `IDLE`,
   `STOPPED`, or `UNKNOWN`. `OFFLINE` is assigned by the worker when RTSP frame
   reads fail.
-- Rule settings are stored per camera. `motion_threshold` and `stop_seconds`
-  live on the `cameras` table; debounce/unknown settings live in
-  `camera.detector_config.rule`; tracker scoring settings live in
-  `camera.detector_config.tracker`; saved changes must increment
-  `config_version`.
+- Rules are shared entities under `/api/rules`. A rule declares supported
+  detector types and can be bound to multiple detection tasks; editing a rule
+  increments its version and affects all bound tasks.
 - REST APIs generally return the shared shape from `app.core.responses`:
   `{"ok": true, "data": ..., "message": ""}` or the failure equivalent.
 - Frontend compatibility routes also support a `code` style response and string
   camera IDs such as `cam_001`; internal database IDs remain numeric.
 - Worker output is visible through `/api/system/workers` and
-  `/api/cameras/{id}/last-result`.
+  `/api/detection-tasks/{id}/last-result`.
 - Event review is centered on `events` and `event_frames`. Preserve open,
   recover, sampled, and manual frame data when changing event behavior.
 - The project favors local/intranet diagnostics. External alert integrations are
@@ -129,8 +130,10 @@ treated as a full-stack skeleton unless those directories are present.
 Core backend routes include:
 
 - Cameras: `/api/cameras`
-- Camera workers: `/api/cameras/{id}/start`, `/api/cameras/{id}/stop`,
-  `/api/cameras/{id}/last-result`
+- Detection tasks: `/api/detection-tasks`,
+  `/api/detection-tasks/{id}/start`,
+  `/api/detection-tasks/{id}/stop`,
+  `/api/detection-tasks/{id}/last-result`
 - Debug detection and snapshots: `/api/cameras/{id}/snapshot`,
   `/api/cameras/{id}/debug-detect`, `/api/cameras/{id}/image-detect`
 - Video: `/api/cameras/{id}/frame.jpg`, `/api/cameras/{id}/stream.mjpg`
@@ -138,8 +141,7 @@ Core backend routes include:
 - Events: `/api/events`, `/api/events/summary`, `/api/events/{id}/frames`
 - Models: `/api/models`, `/api/models/upload`, `/api/models/register`,
   `/api/models/bind-camera`
-- Rules: `/api/cameras/{camera_ref}/rule`,
-  `/api/cameras/{camera_ref}/rule/copy`, `/api/rule-templates`
+- Rules: `/api/rules`, `/api/rules/{id}`, `/api/rules/{id}/usage`
 - Config: `/api/config/export`, `/api/config/import`
 - System: `/api/system/health`, `/api/system/workers`,
   `/api/system/self-check`, `/api/system/storage`, `/api/system/backup`,
@@ -154,7 +156,6 @@ Frontend compatibility routes include:
 - `/api/settings`
 - `/api/debug/keypoints`
 - `/api/alarms`
-- `/api/tasks`
 
 ## Development Guidelines
 

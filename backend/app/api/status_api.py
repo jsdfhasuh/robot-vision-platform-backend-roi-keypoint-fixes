@@ -15,12 +15,20 @@ logger = get_logger(__name__)
 
 @router.get("/api/status")
 def list_status(db: Session = Depends(get_db)):
-    return ok(status_service.list_status(db))
+    rows = status_service.list_task_status(db)
+    return ok([status_service.task_status_to_dict(row) for row in rows])
 
 
 @router.get("/api/status/{camera_id}")
 def get_status(camera_id: int, db: Session = Depends(get_db)):
-    return ok(status_service.get_status(db, camera_id))
+    aggregate = status_service.get_status(db, camera_id)
+    stream = status_service.get_stream_status(db, camera_id)
+    tasks = status_service.list_task_status(db, camera_id=camera_id)
+    return ok({
+        "camera": status_service.status_to_dict(aggregate) if aggregate else None,
+        "stream": status_service.stream_status_to_dict(stream) if stream else None,
+        "tasks": [status_service.task_status_to_dict(row) for row in tasks],
+    })
 
 
 @router.websocket("/ws/status")

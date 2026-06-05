@@ -167,11 +167,12 @@ docker compose -f docker-compose.backend.yml up -d --build
 
 1. 新增摄像头。
 2. 调用 RTSP test。
-3. 启动 Worker。
-4. 打开 raw MJPEG。
-5. 打开 annotated MJPEG。
-6. 查看 `/api/system/workers`。
-7. 查看 `/api/cameras/{id}/last-result`。
+3. 查看自动创建的默认检测任务。
+4. 启动检测任务。
+5. 打开 raw MJPEG。
+6. 打开 annotated MJPEG。
+7. 查看 `/api/system/workers`。
+8. 查看 `/api/detection-tasks/{id}/last-result`。
 
 验收：
 

@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 from app.core.config import settings
 from app.core.logging import get_logger
 from app.models.camera import Camera
+from app.models.detection_task import CameraStreamStatus, DetectionTask, TaskStatus
 from app.models.status import CameraStatus
 from app.services import status_service, worker_service
 from app.services.video_stream_service import frame_cache
@@ -73,6 +74,10 @@ def _status_name(status: str | None) -> str:
 
 def camera_card(db: Session, camera: Camera) -> dict[str, Any]:
     st = db.query(CameraStatus).filter(CameraStatus.camera_id == camera.id).first()
+    stream = db.query(CameraStreamStatus).filter(CameraStreamStatus.camera_id == camera.id).first()
+    task_rows = db.query(DetectionTask).filter(DetectionTask.camera_id == camera.id).all()
+    task_statuses = db.query(TaskStatus).filter(TaskStatus.camera_id == camera.id).all()
+    running_count = sum(1 for task in task_rows if worker_service.get_task_result(task.id).get("running"))
     area, line = _split_location(camera.location or "")
     cfg = camera.detector_config or {}
     meta = cfg.get("frontend_meta") if isinstance(cfg, dict) else None
@@ -93,6 +98,17 @@ def camera_card(db: Session, camera: Camera) -> dict[str, Any]:
         "enabled": bool(camera.enabled),
         "status": _status_name(st.status if st else None),
         "runtime_state": st.status if st else "UNKNOWN",
+        "stream_status": stream.stream_status if stream else "OFFLINE",
+        "stream_last_frame_time": _fmt_dt(stream.last_frame_time if stream else None),
+        "task_count": len(task_rows),
+        "running_task_count": running_count,
+        "task_status_summary": {
+            "RUNNING": sum(1 for row in task_statuses if row.status == "RUNNING"),
+            "IDLE": sum(1 for row in task_statuses if row.status == "IDLE"),
+            "STOPPED": sum(1 for row in task_statuses if row.status == "STOPPED"),
+            "UNKNOWN": sum(1 for row in task_statuses if row.status == "UNKNOWN"),
+            "OFFLINE": sum(1 for row in task_statuses if row.status == "OFFLINE"),
+        },
         "stream_type": "mjpeg",
         "last_online_at": _fmt_dt(st.last_frame_time if st else None),
         "rtsp_url_masked": _mask_rtsp(camera.rtsp_url),

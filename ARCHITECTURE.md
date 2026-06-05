@@ -24,12 +24,14 @@ RTSP Frame
   ↓
 FrameReader
   ↓
-RuntimeContext
+CameraStreamWorker
+  ↓
+TaskRuntime（每个 detection_task 独立）
   ├── DetectorFactory 创建检测器
   ├── SimpleTracker 轨迹统计
   └── RobotStopRule 状态判断
   ↓
-StatusService 写 camera_status
+StatusService 写 task_status / camera_stream_status
   ↓
 EventService 打开/恢复事件
   ↓
@@ -40,7 +42,8 @@ SnapshotService 保存原图/标注图
 
 ```text
 camera_api.py        摄像头 CRUD、RTSP 测试
-worker_api.py        启动/停止 Worker、last-result
+detection_task_api.py 检测任务 CRUD、启停、last-result
+shared_rule_api.py   共享规则 CRUD、规则使用范围
 debug_api.py         snapshot/debug-detect/image-detect/image-pair-detect
 status_api.py        状态查询、WebSocket
 event_api.py         事件查询、处理、误报、人工关闭
@@ -53,16 +56,18 @@ system_api.py        健康检查、worker 列表、detector 列表
 
 架构优化前，`stream_worker.py` 同时负责拉流、检测、规则、事件、截图、状态写库等逻辑。
 
-架构优化后，`CameraWorker` 只做主循环编排：
+架构优化后，`CameraStreamWorker` 只拉取一份摄像头 RTSP 视频流，
+并把帧分发给该摄像头下运行中的多个 `TaskRuntime`：
 
 ```text
-读取 Camera 配置
-拉取一帧
-裁剪 ROI
-调用 RuntimeContext 执行检测/跟踪/规则
-调用 StatusService 写状态
-调用 EventService 处理事件闭环
-调用 SnapshotService 保存标注图
+读取 Camera 视频源配置
+拉取一帧并发布原始帧
+遍历运行中的 DetectionTask
+按任务裁剪 ROI
+调用 TaskRuntime 执行检测/跟踪/共享规则
+调用 StatusService 写任务状态
+调用 EventService 写任务事件
+调用 SnapshotService 保存任务标注图
 ```
 
 ## 5. 后续扩展建议
@@ -122,7 +127,7 @@ Worker 每轮读取摄像头配置，如果发现 `config_version` 变化，会�
 
 ## 8. Worker 健康诊断
 
-`/api/system/workers` 和 `/api/cameras/{id}/last-result` 会返回 Worker 健康信息：
+`/api/system/workers` 和 `/api/detection-tasks/{id}/last-result` 会返回 Worker 健康信息：
 
 ```text
 running
@@ -142,7 +147,7 @@ runtime.reset_count
 runtime.last_reset_reason
 ```
 
-这些字段用于前端展示“摄像头是否真的在跑、实际 FPS、最近错误和配置是否已生效”。
+这些字段用于前端展示“摄像头流是否在跑、任务实际 FPS、最近错误和配置是否已生效”。
 
 ## 模型注册与事件关键帧扩展
 

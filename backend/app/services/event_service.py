@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 from app.core.logging import get_logger
 from app.detectors.base import DetectResult
 from app.models.camera import Camera
+from app.models.detection_task import DetectionTask
 from app.models.event import Event
 from app.models.event_frame import EventFrame
 from app.services import snapshot_service
@@ -31,6 +32,7 @@ def frame_to_dict(frame: EventFrame) -> dict[str, Any]:
         "id": frame.id,
         "event_id": frame.event_id,
         "camera_id": frame.camera_id,
+        "task_id": frame.task_id,
         "frame_time": frame.frame_time,
         "frame_type": frame.frame_type,
         "status": frame.status,
@@ -50,6 +52,7 @@ def add_event_frame(
     event: Event,
     frame_type: str,
     status: str,
+    task: DetectionTask | None = None,
     image_path: str | None = None,
     annotated_image_path: str | None = None,
     detector_type: str = "",
@@ -59,6 +62,7 @@ def add_event_frame(
     row = EventFrame(
         event_id=event.id,
         camera_id=event.camera_id,
+        task_id=task.id if task else event.task_id,
         frame_type=frame_type,
         status=status,
         image_path=image_path,
@@ -79,10 +83,20 @@ def list_event_frames(db: Session, event_id: int) -> list[dict[str, Any]]:
     rows = db.query(EventFrame).filter(EventFrame.event_id == event_id).order_by(EventFrame.id.asc()).all()
     return [frame_to_dict(row) for row in rows]
 
-def event_to_dict(event: Event, now: datetime | None = None) -> dict[str, Any]:
+def event_to_dict(event: Event, now: datetime | None = None, db: Session | None = None) -> dict[str, Any]:
+    camera_name = ""
+    task_name = ""
+    if db is not None:
+        camera = db.query(Camera).filter(Camera.id == event.camera_id).first()
+        task = db.query(DetectionTask).filter(DetectionTask.id == event.task_id).first() if event.task_id else None
+        camera_name = camera.name if camera else ""
+        task_name = task.name if task else ""
     return {
         "id": event.id,
         "camera_id": event.camera_id,
+        "camera_name": camera_name,
+        "task_id": event.task_id,
+        "task_name": task_name,
         "event_type": event.event_type,
         "status": event.status,
         "start_time": event.start_time,
@@ -107,8 +121,14 @@ def event_to_dict(event: Event, now: datetime | None = None) -> dict[str, Any]:
     }
 
 
-def event_types_for_camera(camera: Camera | None = None) -> set[str]:
+def event_types_for_camera(camera: Camera | None = None, task: DetectionTask | None = None) -> set[str]:
     default = {"STOPPED", "OFFLINE"}
+    if task and isinstance(task.detector_config, dict):
+        configured = task.detector_config.get("event_types")
+        if isinstance(configured, list):
+            return {str(x).upper() for x in configured if str(x).strip()}
+        if task.detector_config.get("enable_unknown_event") is True:
+            return default | {"UNKNOWN"}
     if not camera or not isinstance(camera.detector_config, dict):
         return default
     configured = camera.detector_config.get("event_types")
@@ -119,18 +139,21 @@ def event_types_for_camera(camera: Camera | None = None) -> set[str]:
     return default
 
 
-def load_open_events(db: Session, camera_id: int, event_types: set[str]) -> dict[str, int]:
+def load_open_events(db: Session, camera_id: int, event_types: set[str], task_id: int | None = None) -> dict[str, int]:
     rows = (
         db.query(Event)
         .filter(Event.camera_id == camera_id, Event.status == "OPEN", Event.event_type.in_(list(event_types)))
-        .order_by(Event.id.desc())
-        .all()
     )
+    if task_id is None:
+        rows = rows.filter(Event.task_id.is_(None))
+    else:
+        rows = rows.filter(Event.task_id == task_id)
+    rows = rows.order_by(Event.id.desc()).all()
     events: dict[str, int] = {}
     for event in rows:
         events.setdefault(event.event_type, event.id)
     if events:
-        logger.info("loaded open events camera_id=%s events=%s", camera_id, events)
+        logger.info("loaded open events camera_id=%s task_id=%s events=%s", camera_id, task_id, events)
     return events
 
 
@@ -138,6 +161,7 @@ def open_event(
     db: Session,
     *,
     camera: Camera,
+    task: DetectionTask | None = None,
     event_type: str,
     open_event_ids: dict[str, int],
     full_frame=None,
@@ -153,34 +177,43 @@ def open_event(
     existing = (
         db.query(Event)
         .filter(Event.camera_id == camera.id, Event.event_type == event_type, Event.status == "OPEN")
-        .order_by(Event.id.desc())
-        .first()
     )
+    if task is None:
+        existing = existing.filter(Event.task_id.is_(None))
+    else:
+        existing = existing.filter(Event.task_id == task.id)
+    existing = existing.order_by(Event.id.desc()).first()
     if existing:
         open_event_ids[event_type] = existing.id
         return existing
 
     snapshot = snapshot_service.save_image(full_frame, camera_id=camera.id, suffix=f"{event_type.lower()}_open_raw") if full_frame is not None else None
     annotated = None
+    camera_view = camera
+    if task is not None:
+        from types import SimpleNamespace
+
+        camera_view = SimpleNamespace(id=camera.id, name=camera.name, detector_type=task.detector_type, roi=task.roi)
     if roi_frame is not None and result is not None:
         annotated = snapshot_service.save_annotated_image(
             roi_frame,
             result,
             event_type,
-            camera=camera,
+            camera=camera_view,
             rule_detail=rule_detail,
             event_type=event_type,
             suffix=f"{event_type.lower()}_open_annotated",
         )
     event = Event(
         camera_id=camera.id,
+        task_id=task.id if task else None,
         event_type=event_type,
         status="OPEN",
         snapshot_path=snapshot,
         annotated_snapshot_path=annotated,
         reason=(rule_detail or {}).get("reason") or message[:1024],
         rule_detail=rule_detail,
-        detector_type=camera.detector_type,
+        detector_type=task.detector_type if task else camera.detector_type,
         remark=message[:512],
     )
     db.add(event)
@@ -191,16 +224,18 @@ def open_event(
         event=event,
         frame_type="open",
         status=event_type,
+        task=task,
         image_path=snapshot,
         annotated_image_path=annotated,
-        detector_type=camera.detector_type,
+        detector_type=task.detector_type if task else camera.detector_type,
         reason=event.reason,
         rule_detail=rule_detail,
     )
     open_event_ids[event_type] = event.id
     logger.warning(
-        "event opened camera_id=%s event_type=%s event_id=%s snapshot=%s annotated=%s reason=%s",
+        "event opened camera_id=%s task_id=%s event_type=%s event_id=%s snapshot=%s annotated=%s reason=%s",
         camera.id,
+        task.id if task else None,
         event_type,
         event.id,
         snapshot,
@@ -214,6 +249,7 @@ def recover_event(
     db: Session,
     *,
     camera: Camera,
+    task: DetectionTask | None = None,
     event_type: str,
     open_event_ids: dict[str, int],
     full_frame=None,
@@ -229,6 +265,11 @@ def recover_event(
 
     event = db.query(Event).filter(Event.id == event_id).first()
     if event and event.status == "OPEN":
+        camera_view = camera
+        if task is not None:
+            from types import SimpleNamespace
+
+            camera_view = SimpleNamespace(id=camera.id, name=camera.name, detector_type=task.detector_type, roi=task.roi)
         event.end_time = datetime.utcnow()
         event.status = "RECOVERED"
         event.recovery_snapshot_path = snapshot_service.save_image(
@@ -241,7 +282,7 @@ def recover_event(
                 roi_frame,
                 result,
                 "RECOVERED",
-                camera=camera,
+                camera=camera_view,
                 rule_detail=rule_detail,
                 event_type=event_type,
                 suffix=f"{event_type.lower()}_recover_annotated",
@@ -253,16 +294,18 @@ def recover_event(
             event=event,
             frame_type="recover",
             status="RECOVERED",
+            task=task,
             image_path=event.recovery_snapshot_path,
             annotated_image_path=event.recovery_annotated_path,
-            detector_type=camera.detector_type,
+            detector_type=task.detector_type if task else camera.detector_type,
             reason=event.reason,
             rule_detail=rule_detail,
         )
         db.commit()
         logger.info(
-            "event recovered camera_id=%s event_type=%s event_id=%s recovery_snapshot=%s recovery_annotated=%s",
+            "event recovered camera_id=%s task_id=%s event_type=%s event_id=%s recovery_snapshot=%s recovery_annotated=%s",
             camera.id,
+            task.id if task else None,
             event_type,
             event.id,
             event.recovery_snapshot_path,
@@ -276,6 +319,7 @@ def handle_status_change(
     db: Session,
     *,
     camera: Camera,
+    task: DetectionTask | None = None,
     status: str,
     open_event_ids: dict[str, int],
     full_frame=None,
@@ -284,14 +328,15 @@ def handle_status_change(
     message: str = "",
     rule_detail: dict[str, Any] | None = None,
 ) -> dict[str, int]:
-    event_types = event_types_for_camera(camera)
+    event_types = event_types_for_camera(camera, task)
     if not open_event_ids:
-        open_event_ids.update(load_open_events(db, camera.id, event_types))
+        open_event_ids.update(load_open_events(db, camera.id, event_types, task.id if task else None))
 
     if status in event_types:
         open_event(
             db,
             camera=camera,
+            task=task,
             event_type=status,
             open_event_ids=open_event_ids,
             full_frame=full_frame,
@@ -306,6 +351,7 @@ def handle_status_change(
             recover_event(
                 db,
                 camera=camera,
+                task=task,
                 event_type=event_type,
                 open_event_ids=open_event_ids,
                 full_frame=full_frame,
@@ -318,6 +364,7 @@ def handle_status_change(
         recover_event(
             db,
             camera=camera,
+            task=task,
             event_type="OFFLINE",
             open_event_ids=open_event_ids,
             full_frame=full_frame,
@@ -331,6 +378,7 @@ def handle_status_change(
         recover_event(
             db,
             camera=camera,
+            task=task,
             event_type="UNKNOWN",
             open_event_ids=open_event_ids,
             full_frame=full_frame,
@@ -348,6 +396,7 @@ def sample_open_event_frames(
     db: Session,
     *,
     camera: Camera,
+    task: DetectionTask | None = None,
     open_event_ids: dict[str, int],
     full_frame=None,
     roi_frame=None,
@@ -371,6 +420,11 @@ def sample_open_event_frames(
     max_frames_per_event = max(1, int(max_frames_per_event or 60))
     now = datetime.utcnow()
     created: list[EventFrame] = []
+    camera_view = camera
+    if task is not None:
+        from types import SimpleNamespace
+
+        camera_view = SimpleNamespace(id=camera.id, name=camera.name, detector_type=task.detector_type, roi=task.roi)
     for event_type, event_id in list(open_event_ids.items()):
         event = db.query(Event).filter(Event.id == event_id, Event.status == "OPEN").first()
         if not event:
@@ -401,7 +455,7 @@ def sample_open_event_frames(
                 roi_frame,
                 result,
                 status or event_type,
-                camera=camera,
+                camera=camera_view,
                 rule_detail=rule_detail,
                 event_type=event_type,
                 suffix=f"{event_type.lower()}_sample_annotated",
@@ -411,9 +465,10 @@ def sample_open_event_frames(
             event=event,
             frame_type="sample",
             status=status or event_type,
+            task=task,
             image_path=snapshot,
             annotated_image_path=annotated,
-            detector_type=camera.detector_type,
+            detector_type=task.detector_type if task else camera.detector_type,
             reason=(rule_detail or {}).get("reason") or message or event.reason,
             rule_detail=rule_detail,
         ))
@@ -423,6 +478,7 @@ def list_events(
     db: Session,
     *,
     camera_id: int | None = None,
+    task_id: int | None = None,
     event_type: str | None = None,
     status: str | None = None,
     handled: bool | None = None,
@@ -434,6 +490,8 @@ def list_events(
     q = db.query(Event)
     if camera_id is not None:
         q = q.filter(Event.camera_id == camera_id)
+    if task_id is not None:
+        q = q.filter(Event.task_id == task_id)
     if event_type:
         q = q.filter(Event.event_type == event_type.upper())
     if status:
@@ -449,7 +507,7 @@ def list_events(
     rows = q.order_by(Event.id.desc()).limit(limit).all()
     now = datetime.utcnow()
     logger.debug("list events count=%s", len(rows))
-    return [event_to_dict(e, now) for e in rows]
+    return [event_to_dict(e, now, db) for e in rows]
 
 
 def summary(db: Session, *, camera_id: int | None = None, days: int = 1) -> dict[str, Any]:
@@ -472,7 +530,7 @@ def summary(db: Session, *, camera_id: int | None = None, days: int = 1) -> dict
         "by_type": dict(by_type),
         "by_status": dict(by_status),
         "avg_duration_seconds": round(sum(durations) / len(durations), 3) if durations else 0,
-        "open_events": [event_to_dict(e) for e in open_events[:50]],
+        "open_events": [event_to_dict(e, db=db) for e in open_events[:50]],
     }
 
 

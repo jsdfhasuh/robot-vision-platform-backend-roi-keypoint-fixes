@@ -110,6 +110,12 @@ def import_config(db: Session, payload: dict) -> dict:
         imported += 1
 
     db.commit()
+    from app.services import detection_task_service
+
+    for camera_id in created_ids:
+        row = db.query(Camera).filter(Camera.id == camera_id).first()
+        if row:
+            detection_task_service.ensure_default_task_for_camera(db, row)
     logger.info(
         "config imported cameras=%s updated=%s created=%s models=%s skipped_models=%s",
         imported,

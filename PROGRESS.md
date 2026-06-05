@@ -25,9 +25,9 @@
 ## 本次架构优化完成内容
 
 1. 新增 `backend/app/services/` 服务层。
-2. 拆分原 `camera_api.py`：
+2. 拆分原 `camera_api.py`（后续检测任务重构已移除旧 `worker_api.py` 路由）：
    - `camera_api.py`
-   - `worker_api.py`
+   - `detection_task_api.py`
    - `debug_api.py`
 3. 重写 `event_api.py`，事件逻辑下沉到 `event_service.py`。
 4. 重写 `model_api.py`，模型逻辑下沉到 `model_service.py`。
@@ -73,7 +73,7 @@
    - 配置导出时会包含 `config_version`，方便前端判断配置版本。
 
 3. **Worker 健康状态增强**
-   - `/api/system/workers` 和 `/api/cameras/{id}/last-result` 现在会返回更完整的运行诊断信息：
+   - `/api/system/workers` 和 `/api/detection-tasks/{id}/last-result` 现在会返回更完整的运行诊断信息：
      - `running`
      - `rtsp_connected`
      - `last_frame_time`
@@ -322,7 +322,7 @@ GET /api/system/streams
 6. 新增 `/api/settings`、`/api/settings/save`、`/api/settings/apply`、`/api/settings/reset`。
 7. 新增 `/api/debug/keypoints` 和 `/api/debug/keypoints/evaluate`。
 8. 新增 `/api/alarms` 兼容事件中心。
-9. 新增 `/api/tasks` 兼容摄像头 Worker。
+9. 旧 `/api/tasks` 兼容摄像头 Worker 已被 `/api/detection-tasks` 替代。
 10. 支持 `cam_001` 形式的摄像头 ID，与数字 ID 兼容。
 
 本轮后端整体完成度估计：**89%**。
@@ -343,23 +343,18 @@ GET /api/system/streams
 - `/api/debug/keypoints` 现在返回每个关键点自己的 `delta_px / avg_delta_px / moving / valid`。
 - 模型管理限制只允许 `.onnx`，与当前 ONNXRuntime 推理后端一致。
 
-## 2026-06-02 后端新增：规则面板接口、规则复制、规则模板
+## 2026-06-02 后端新增：规则面板接口、规则复制、规则模板（历史）
 
-本轮新增规则管理能力，供前端规则面板接入：
+本轮曾新增摄像头级规则接口；后续检测任务重构已替换为共享规则接口 `/api/rules`：
 
-- 新增单摄像头规则接口：
-  - `GET /api/cameras/{camera_ref}/rule`
-  - `PUT /api/cameras/{camera_ref}/rule`
-- 新增摄像头间规则复制接口：
-  - `POST /api/cameras/{source_ref}/rule/copy`
-- 新增规则模板接口：
-  - `GET /api/rule-templates`
-  - `POST /api/rule-templates`
-  - `GET /api/rule-templates/{template_id}`
-  - `PUT /api/rule-templates/{template_id}`
-  - `DELETE /api/rule-templates/{template_id}`
-  - `POST /api/rule-templates/{template_id}/apply`
-- 新增 `rule_templates` 表，用于保存规则模板。
+- 当前规则接口：
+  - `GET /api/rules`
+  - `POST /api/rules`
+  - `GET /api/rules/{rule_id}`
+  - `PUT /api/rules/{rule_id}`
+  - `DELETE /api/rules/{rule_id}`
+  - `GET /api/rules/{rule_id}/usage`
+- 当前共享规则表为 `rules`，检测任务通过 `rule_id` 引用。
 - 规则全量保存时会更新：
   - `cameras.motion_threshold`
   - `cameras.stop_seconds`

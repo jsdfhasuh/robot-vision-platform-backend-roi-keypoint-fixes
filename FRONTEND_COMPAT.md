@@ -186,17 +186,23 @@ GET /api/alarms/{alarm_id}/snapshot
 
 `alarm_001` 会映射到内部事件 ID `1`。
 
-## 9. 检测任务兼容接口
+## 9. 检测任务接口
 
-后端当前没有独立 Task 表，检测任务暂时由摄像头 Worker 表示：
+检测任务现在是独立实体。一个摄像头可以有多个检测任务，多个任务共享同一路
+RTSP 拉流：
 
 ```http
-GET  /api/tasks
-POST /api/tasks/{task_id}/start
-POST /api/tasks/{task_id}/stop
+GET    /api/detection-tasks
+POST   /api/detection-tasks
+GET    /api/detection-tasks/{task_id}
+PUT    /api/detection-tasks/{task_id}
+DELETE /api/detection-tasks/{task_id}
+POST   /api/detection-tasks/{task_id}/start
+POST   /api/detection-tasks/{task_id}/stop
+GET    /api/detection-tasks/{task_id}/last-result
 ```
 
-`task_001` 会映射到摄像头 ID `1`。
+旧 `/api/tasks` 和 `/api/cameras/{id}/start|stop|last-result` 已移除。
 
 ## 10. 推荐前端联调顺序
 

@@ -4,6 +4,7 @@ from datetime import datetime
 from sqlalchemy import String, Integer, DateTime, ForeignKey, JSON
 from sqlalchemy.orm import Mapped, mapped_column
 from app.database import Base
+from app.models.detection_task import DetectionTask  # noqa: F401 - register FK target with SQLAlchemy metadata
 
 
 class EventFrame(Base):
@@ -18,6 +19,7 @@ class EventFrame(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     event_id: Mapped[int] = mapped_column(Integer, ForeignKey("events.id"), index=True)
     camera_id: Mapped[int] = mapped_column(Integer, ForeignKey("cameras.id"), index=True)
+    task_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("detection_tasks.id"), nullable=True, index=True)
     frame_time: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
     frame_type: Mapped[str] = mapped_column(String(64), default="open")
     status: Mapped[str] = mapped_column(String(32), default="UNKNOWN")

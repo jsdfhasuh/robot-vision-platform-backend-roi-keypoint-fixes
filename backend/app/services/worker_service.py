@@ -18,14 +18,18 @@ def ensure_camera_exists(db: Session, camera_id: int) -> Camera:
 
 
 def start_camera(db: Session, camera_id: int) -> dict:
+    """Internal compatibility helper: start the default task for a camera."""
     ensure_camera_exists(db, camera_id)
-    success, message = camera_manager.start(camera_id)
-    logger.info("start camera requested id=%s success=%s message=%s", camera_id, success, message)
-    return {"success": success, "message": message, "camera_id": camera_id}
+    from app.services import detection_task_service
+
+    task = detection_task_service.default_task_for_camera(db, camera_id)
+    if task is None:
+        raise HTTPException(404, "default detection task not found")
+    return detection_task_service.start_task(db, task.id)
 
 
 def stop_camera(camera_id: int) -> dict:
-    success, message = camera_manager.stop(camera_id)
+    success, message = camera_manager.stop_camera(camera_id)
     logger.info("stop camera requested id=%s success=%s message=%s", camera_id, success, message)
     return {"success": success, "message": message, "camera_id": camera_id}
 
@@ -35,7 +39,14 @@ def list_workers() -> list[dict]:
 
 
 def get_last_result(camera_id: int) -> dict:
-    state = camera_manager.get_debug_state(camera_id)
+    state = camera_manager.get_first_task_state_for_camera(camera_id)
     if state is None:
         return {"running": False, "message": "worker not running", "camera_id": camera_id}
+    return state
+
+
+def get_task_result(task_id: int) -> dict:
+    state = camera_manager.get_task_state(task_id)
+    if state is None:
+        return {"running": False, "message": "task not running", "task_id": task_id}
     return state

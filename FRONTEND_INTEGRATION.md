@@ -2,7 +2,7 @@
 
 本文档给前端工程师使用，说明如何接入当前机器人视觉检测后端。
 
-后端定位：提供摄像头管理、RTSP Worker 控制、实时状态、MJPEG 视频流、ROI 配置、模型管理、事件复盘和前端兼容接口。前端项目可以独立维护，只通过 HTTP API、MJPEG `<img>`、WebSocket 接入。
+后端定位：提供摄像头管理、检测任务控制、实时状态、MJPEG 视频流、ROI 配置、模型管理、事件复盘和前端兼容接口。前端项目可以独立维护，只通过 HTTP API、MJPEG `<img>`、WebSocket 接入。
 
 ## 1. 基础信息
 
@@ -117,19 +117,20 @@ cam_003
 建议：
 
 - 页面展示、路由参数可以使用 `id`，例如 `cam_001`。
-- 调用老后端核心接口时优先使用 `numeric_id`，例如启动 Worker、更新摄像头、绑定模型。
-- 视频流、ROI、runtime、settings、alarms、tasks 兼容接口可以直接使用 `cam_001`。
+- 调用核心接口时优先使用 `numeric_id`，例如更新摄像头、创建检测任务、绑定模型。
+- 视频流、ROI、runtime、settings、alarms 兼容接口可以继续使用 `cam_001`。
 
 ## 4. 推荐接入顺序
 
 1. `GET /api/system/health`：确认后端可用。
 2. `GET /api/cameras`：获取摄像头卡片列表。
-3. `POST /api/cameras/{numeric_id}/start`：启动某路摄像头 Worker。
-4. `<img src="/stream/cameras/cam_001/mjpeg?annotated=true" />`：显示视频流。
-5. `GET /api/runtime/status`：轮询实时状态聚合。
-6. `GET /api/cameras/cam_001/roi` 和 `POST /api/cameras/cam_001/roi`：接 ROI 绘制保存。
-7. `GET /api/debug/keypoints?camera_id=cam_001`：接关键点调试面板。
-8. `GET /api/events` 或 `GET /api/alarms`：接事件/告警列表。
+3. `GET /api/detection-tasks?camera_id={numeric_id}`：获取该摄像头的检测任务。
+4. `POST /api/detection-tasks/{task_id}/start`：启动检测任务，后端自动启动对应摄像头共享拉流。
+5. `<img src="/stream/cameras/cam_001/mjpeg?annotated=true" />`：显示视频流。
+6. `GET /api/runtime/status`：轮询实时状态聚合。
+7. `GET /api/cameras/cam_001/roi` 和 `POST /api/cameras/cam_001/roi`：接 ROI 绘制保存。
+8. `GET /api/debug/keypoints?camera_id=cam_001`：接关键点调试面板。
+9. `GET /api/events` 或 `GET /api/alarms`：接事件/告警列表。
 9. `GET /api/models`、`POST /api/models/upload`、`POST /api/models/bind-camera`：接模型管理。
 
 ## 5. 摄像头管理
@@ -255,27 +256,27 @@ POST /api/cameras/{numeric_id}/test
 }
 ```
 
-## 6. Worker 控制和运行状态
+## 6. 检测任务控制和运行状态
 
-### 6.1 启动摄像头 Worker
-
-```http
-POST /api/cameras/{numeric_id}/start
-```
-
-### 6.2 停止摄像头 Worker
+### 6.1 启动检测任务
 
 ```http
-POST /api/cameras/{numeric_id}/stop
+POST /api/detection-tasks/{task_id}/start
 ```
 
-### 6.3 获取单路最近检测结果
+### 6.2 停止检测任务
 
 ```http
-GET /api/cameras/{numeric_id}/last-result
+POST /api/detection-tasks/{task_id}/stop
 ```
 
-返回内容包含 Worker 是否运行、RTSP 是否连通、FPS、错误次数、最新检测结果、tracker/rule 细节等。详情页和调试页建议使用这个接口。
+### 6.3 获取任务最近检测结果
+
+```http
+GET /api/detection-tasks/{task_id}/last-result
+```
+
+返回内容包含任务是否运行、共享 RTSP 流是否连通、FPS、错误次数、最新检测结果、tracker/rule 细节等。详情页和调试页建议使用这个接口。
 
 ### 6.4 获取所有 Worker 诊断
 
@@ -557,80 +558,63 @@ Content-Type: application/json
 POST /api/settings/reset
 ```
 
-## 11. 规则面板
+## 11. 共享规则面板
 
-规则面板用于配置机器人停机判断。当前后端不是每个检测器单独判断停机，而是：
+规则面板用于配置机器人停机判断。检测任务运行时调用绑定的共享规则：
 
 ```text
-detector -> DetectResult
-tracker  -> 运动分数
-rule     -> RUNNING / IDLE / STOPPED / UNKNOWN
+task detector -> DetectResult
+task tracker  -> 运动分数
+shared rule   -> RUNNING / IDLE / STOPPED / UNKNOWN + detail
 ```
 
-`OFFLINE` 不是规则分数判断出来的，而是 Worker 读不到 RTSP 帧时直接判定。
+`OFFLINE` 不是规则分数判断出来的，而是摄像头共享拉流读不到 RTSP 帧时直接判定。
 
-### 11.1 获取摄像头规则
+### 11.1 规则列表
 
 ```http
-GET /api/cameras/cam_001/rule
+GET /api/rules
 ```
 
-返回：
-
-```json
-{
-  "camera_id": "cam_001",
-  "numeric_camera_id": 1,
-  "detector_type": "yolo_pose",
-  "rule": {
-    "motion_threshold": 4,
-    "stop_seconds": 30,
-    "unknown_seconds": 10,
-    "confirm_frames": 2,
-    "status_hold_seconds": 1.0
-  },
-  "tracker": {
-    "movement_score": "keypoint_mean_step",
-    "window_seconds": 30,
-    "min_step_px": 1.5
-  },
-  "current": {
-    "status": "STOPPED",
-    "message": "yolo_pose: ...",
-    "motion_distance": 1.2,
-    "rule_detail": {},
-    "tracker": {}
-  },
-  "config_version": 3,
-  "updated_at": "2026-06-01T10:00:00"
-}
-```
-
-### 11.2 保存摄像头规则
+### 11.2 创建规则
 
 ```http
-PUT /api/cameras/cam_001/rule
+POST /api/rules
 Content-Type: application/json
 ```
 
-规则保存使用全量提交：
-
 ```json
 {
-  "rule": {
+  "name": "motion 停机规则",
+  "description": "适用于 motion 检测任务",
+  "supported_detector_types": ["motion"],
+  "rule_config": {
     "motion_threshold": 4,
     "stop_seconds": 30,
     "unknown_seconds": 10,
     "confirm_frames": 2,
     "status_hold_seconds": 1.0
-  },
-  "tracker": {
-    "movement_score": "keypoint_mean_step",
-    "window_seconds": 30,
-    "min_step_px": 1.5
   }
 }
 ```
+
+### 11.3 更新规则
+
+```http
+PUT /api/rules/{rule_id}
+Content-Type: application/json
+```
+
+```json
+{
+  "rule_config": {
+    "motion_threshold": 6,
+    "stop_seconds": 20
+  }
+}
+```
+
+保存后规则 `version` 会递增。所有绑定该规则的检测任务会在运行时热更新。
 
 字段说明：
 
@@ -639,102 +623,14 @@ Content-Type: application/json
 - `unknown_seconds`：目标/关键点短暂丢失宽限时间。
 - `confirm_frames`：状态切换需要连续确认的帧数。
 - `status_hold_seconds`：状态最短保持时间，防止抖动。
-- `movement_score`：选择 tracker 用哪个分数参与停机判断。
-- `window_seconds`：tracker 统计窗口秒数。
-- `min_step_px`：小于该像素位移视作抖动。
 
-`movement_score` 可选值：
-
-```text
-total_displacement
-avg_speed
-max_step
-net_displacement
-keypoint_mean_step
-keypoint_max_step
-angle_change
-raw
-```
-
-保存后后端会递增 `config_version`，Worker 会热更新并重置 rule/tracker 状态。
-
-### 11.3 从一个摄像头复制规则到多个摄像头
+### 11.4 查看规则影响范围
 
 ```http
-POST /api/cameras/cam_001/rule/copy
-Content-Type: application/json
+GET /api/rules/{rule_id}/usage
 ```
 
-```json
-{
-  "target_camera_ids": ["cam_002", "cam_003"]
-}
-```
-
-复制内容只包含：
-
-- `rule`
-- `tracker`
-
-不会复制 RTSP、模型、ROI、摄像头名称等信息。
-
-### 11.4 规则模板
-
-列表：
-
-```http
-GET /api/rule-templates
-```
-
-创建：
-
-```http
-POST /api/rule-templates
-Content-Type: application/json
-```
-
-```json
-{
-  "name": "机器人关键点停机规则",
-  "description": "适用于 YOLO Pose 关键点检测",
-  "detector_type": "yolo_pose",
-  "rule": {
-    "motion_threshold": 4,
-    "stop_seconds": 30,
-    "unknown_seconds": 10,
-    "confirm_frames": 2,
-    "status_hold_seconds": 1.0
-  },
-  "tracker": {
-    "movement_score": "keypoint_mean_step",
-    "window_seconds": 30,
-    "min_step_px": 1.5
-  }
-}
-```
-
-详情、更新、删除：
-
-```http
-GET    /api/rule-templates/{template_id}
-PUT    /api/rule-templates/{template_id}
-DELETE /api/rule-templates/{template_id}
-```
-
-应用模板到摄像头：
-
-```http
-POST /api/rule-templates/{template_id}/apply
-Content-Type: application/json
-```
-
-```json
-{
-  "camera_ids": ["cam_001", "cam_002"]
-}
-```
-
-应用模板后目标摄像头 `config_version` 会递增。
+前端在编辑共享规则前应展示影响任务数量和任务列表，避免用户无意影响多个任务。
 
 ## 12. 关键点调试
 

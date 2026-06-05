@@ -25,6 +25,7 @@ class FalseAlarmPayload(BaseModel):
 @router.get("")
 def list_events(
     camera_id: int | None = Query(None),
+    task_id: int | None = Query(None),
     event_type: str | None = Query(None),
     status: str | None = Query(None),
     handled: bool | None = Query(None),
@@ -37,6 +38,7 @@ def list_events(
     data = event_service.list_events(
         db,
         camera_id=camera_id,
+        task_id=task_id,
         event_type=event_type,
         status=status,
         handled=handled,
@@ -60,7 +62,7 @@ def event_summary(
 @router.get("/{event_id}")
 def get_event(event_id: int, db: Session = Depends(get_db)):
     event = event_service.get_event_or_404(db, event_id)
-    return ok(event_service.event_to_dict(event))
+    return ok(event_service.event_to_dict(event, db=db))
 
 
 

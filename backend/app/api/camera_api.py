@@ -8,7 +8,6 @@ from app.database import get_db
 from app.schemas.camera import CameraCreate, CameraUpdate
 from app.services import camera_service
 from app.services import frontend_adapter_service as fas
-from app.services.worker_service import stop_camera
 
 router = APIRouter(prefix="/api/cameras", tags=["cameras"])
 
@@ -46,7 +45,6 @@ def update_camera(camera_id: int, payload: CameraUpdate, db: Session = Depends(g
 
 @router.delete("/{camera_id}")
 def delete_camera(camera_id: int, db: Session = Depends(get_db)):
-    stop_camera(camera_id)
     deleted = camera_service.delete_camera(db, camera_id)
     return ok({"id": deleted.id}, "camera deleted")
 

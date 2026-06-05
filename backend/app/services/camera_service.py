@@ -15,7 +15,12 @@ FRONTEND_META_KEYS = {"area", "line", "robot_id", "robot_name"}
 
 
 def _split_frontend_fields(data: dict) -> tuple[dict, dict]:
-    meta = {k: data.pop(k) for k in list(data.keys()) if k in FRONTEND_META_KEYS and data.get(k) is not None}
+    meta = {}
+    for key in list(data.keys()):
+        if key in FRONTEND_META_KEYS:
+            value = data.pop(key)
+            if value is not None:
+                meta[key] = value
     if (not data.get("location")) and (meta.get("area") or meta.get("line")):
         data["location"] = "/".join([x for x in [meta.get("area"), meta.get("line")] if x])
     return data, meta
@@ -56,6 +61,9 @@ def create_camera(db: Session, payload: CameraCreate) -> Camera:
     if status is None:
         db.add(CameraStatus(camera_id=camera.id, status="UNKNOWN", message="created"))
         db.commit()
+    from app.services import detection_task_service
+
+    detection_task_service.ensure_default_task_for_camera(db, camera)
 
     logger.info(
         "camera created id=%s name=%s detector=%s enabled=%s",
@@ -97,6 +105,9 @@ def update_camera(db: Session, camera_id: int, payload: CameraUpdate) -> Camera:
 
 def delete_camera(db: Session, camera_id: int) -> Camera:
     camera = get_camera(db, camera_id)
+    from app.services import detection_task_service
+
+    detection_task_service.delete_tasks_for_camera(db, camera_id)
     logger.info("camera deleted id=%s name=%s", camera.id, camera.name)
     db.delete(camera)
     db.commit()

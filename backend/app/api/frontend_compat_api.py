@@ -124,7 +124,7 @@ async def evaluate_keypoints(request: Request, db: Session = Depends(get_db)):
 # 前端“告警中心”兼容层：后端实际使用 events 事件中心。
 # -------------------------
 from fastapi import Body
-from app.services import event_service, snapshot_service, camera_service, worker_service
+from app.services import event_service, snapshot_service, camera_service
 from app.models.camera import Camera
 from app.models.event import Event
 from datetime import datetime
@@ -228,50 +228,3 @@ def alarm_snapshot(alarm_id: str, annotated: bool = Query(False), db: Session = 
     with open(path, "rb") as f:
         data = f.read()
     return Response(content=data, media_type="image/jpeg", headers={"Cache-Control": "no-store"})
-
-
-@router.get("/api/tasks")
-def list_tasks(db: Session = Depends(get_db)):
-    cameras = db.query(Camera).order_by(Camera.id.asc()).all()
-    workers = {w.get("camera_id"): w for w in worker_service.list_workers()}
-    items = []
-    for camera in cameras:
-        worker = workers.get(camera.id) or {}
-        items.append({
-            "id": f"task_{camera.id:03d}",
-            "numeric_id": camera.id,
-            "name": f"{camera.name}检测任务",
-            "camera_id": fas.camera_code(camera.id),
-            "numeric_camera_id": camera.id,
-            "camera_name": camera.name,
-            "robot_id": f"robot_{camera.id:03d}",
-            "detector_type": camera.detector_type,
-            "enabled": camera.enabled,
-            "running": bool(worker.get("running")),
-            "motion_threshold": camera.motion_threshold,
-            "stop_duration_seconds": camera.stop_seconds,
-            "last_update_at": camera.updated_at,
-            "config_version": camera.config_version,
-        })
-    return code_ok(items)
-
-
-@router.post("/api/tasks/{task_id}/start")
-def start_task(task_id: str, db: Session = Depends(get_db)):
-    camera_id = _parse_task_id(task_id)
-    return code_ok(worker_service.start_camera(db, camera_id), "task started")
-
-
-@router.post("/api/tasks/{task_id}/stop")
-def stop_task(task_id: str):
-    camera_id = _parse_task_id(task_id)
-    return code_ok(worker_service.stop_camera(camera_id), "task stopped")
-
-
-def _parse_task_id(task_id: str | int) -> int:
-    if isinstance(task_id, int):
-        return task_id
-    ref = str(task_id)
-    if ref.startswith("task_"):
-        ref = ref[5:]
-    return fas.parse_camera_ref(ref)
